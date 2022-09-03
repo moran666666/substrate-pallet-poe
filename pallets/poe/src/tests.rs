@@ -45,6 +45,20 @@ fn revoke_claim_works() {
 	});
 }
 
+// revoke_claim_failed 撤消存证的用例测试，失败情况
+#[test]
+fn revoke_claim_failed() {
+	new_test_ext().execute_with(|| {
+		let claim = vec![0, 1];
+		let bounded_claim = BoundedVec::<u8, <Test as Config>::MaxBytesInHash>::try_from(claim).unwrap();
+
+		assert_noop!(
+			PoeModule::revoke_claim(Origin::signed(1), bounded_claim.clone()),
+			Error::<Test>::NoSuchProof
+		);
+	});
+}
+
 // transfer_claim_works 转移存证的用例测试
 #[test]
 fn transfer_claim_works() {
@@ -59,13 +73,34 @@ fn transfer_claim_works() {
 	});
 }
 
-// claim_bounded_error 存证超限错误的用例测试
+// transfer_claim_failed_not_exist 转移存证的用例测试，转移不存在的存证失败的情况
 #[test]
-fn claim_bounded_error() {
+fn transfer_claim_failed_not_exist() {
 	new_test_ext().execute_with(|| {
-		let claim = vec![0u8; 1024];  // 设置一个超长度限制的大数
-		let bounded_claim = BoundedVec::<u8, <Test as Config>::MaxBytesInHash>::try_from(claim).expect("claim bounded overflow error"); // 溢出返回错误
+		let claim = vec![0, 1];
+		let bounded_claim = BoundedVec::<u8, <Test as Config>::MaxBytesInHash>::try_from(claim).unwrap();
 
-		assert_ok!(PoeModule::create_claim(Origin::signed(1), bounded_claim.clone()));
+		let receiver = 2;
+		assert_noop!(
+			PoeModule::transfer_claim(Origin::signed(1), receiver, bounded_claim.clone()),
+			Error::<Test>::NoSuchProof
+		);
+	});
+}
+
+// transfer_claim_failed_not_owner 转移存证的用例测试，转移不属于调用者的存证失败的情况
+#[test]
+fn transfer_claim_failed_not_owner() {
+	new_test_ext().execute_with(|| {
+		let claim = vec![0, 1];
+		let bounded_claim = BoundedVec::<u8, <Test as Config>::MaxBytesInHash>::try_from(claim).unwrap();
+
+		let _ = PoeModule::create_claim(Origin::signed(1), bounded_claim.clone()); // 先创建存证
+
+		let receiver = 2;
+		assert_noop!(
+			PoeModule::transfer_claim(Origin::signed(3), receiver, bounded_claim.clone()),
+			Error::<Test>::NotProofOwner
+		);
 	});
 }
